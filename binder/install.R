@@ -1,0 +1,5 @@
+install.packages("tidyverse")
+install.packages("xgboost")
+install.packages("BiocManager")
+BiocManager::install(c("phyloseq"))
+devtools::install_github("krsirs1128/mbtransfer")
