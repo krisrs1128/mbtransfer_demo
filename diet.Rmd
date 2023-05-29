@@ -2,7 +2,7 @@
 title: "Diet Interventions as Ecological Shifts"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{diet}
+  %\VignetteIndexEntry{Diet Interventions as Ecological Shifts}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -23,7 +23,7 @@ bib <- ReadBib("references.bib")
 
 ### Data and Problem Context
 
-`Citep(bib, "David2013DietRA")` was one of the first studies to draw attention
+`r Citep(bib, "David2013DietRA")` was one of the first studies to draw attention
 to the way the human microbiomes could quickly respond to changes in host
 behavior. This had implications for a lot of how we think of the microbiome in
 health and disease -- it wouldn't make sense to try engineering/manipulating
@@ -51,12 +51,13 @@ th <- theme_bw() +
   theme(
     panel.grid.minor = element_blank(),
     panel.background = element_rect(fill = "#f7f7f7"),
-    panel.border = element_rect(fill = NA, color = "#0c0c0c", size = 0.6),
+    panel.border = element_rect(fill = NA, color = "#0c0c0c", linewidth = 0.6),
     axis.text = element_text(size = 8),
     axis.title = element_text(size = 12),
     legend.position = "bottom"
   )
 theme_set(th)
+set.seed(20230524)
 ```
 
 The block below reads in the data. These are [lightly processed](https://github.com/krisrs1128/microbiome_interventions/blob/main/scripts/data_preprocessing.Rmd) versions of data
@@ -68,9 +69,9 @@ be used by our `ts_from_dfs` function.
 ```{r}
 subject <- read_csv("https://figshare.com/ndownloader/files/40275934/subject.csv")
 interventions <- read_csv("https://figshare.com/ndownloader/files/40279171/interventions.csv") |>
-  column_to_rownames("sample")
+ column_to_rownames("sample")
 reads <- read_csv("https://figshare.com/ndownloader/files/40279108/reads.csv") |>
-  column_to_rownames("sample")
+ column_to_rownames("sample")
 samples <- read_csv("https://figshare.com/ndownloader/files/40275943/samples.csv")
 ```
 
@@ -137,16 +138,16 @@ is not rich enough.
 fits <- list()
 ts_preds <- list()
 
-fits[["in-sample"]] <- mbtransfer(ts, P = 3, Q = 3)
+fits[["in-sample"]] <- mbtransfer(ts, P = 2, Q = 2)
 ts_missing <- subset_values(ts, 1:8)
-ts_preds[["in-sample"]] <- predict(fit[["in-sample"]], ts_missing)
+ts_preds[["in-sample"]] <- predict(fits[["in-sample"]], ts_missing)
 ```
 
 The block below instead trains on five subjects from each intervention group and
 makes predictions for those who were held out.
 
 ```{r}
-fits[["out-of-sample"]] <- mbtransfer(ts[c(1:5, 11:15)], P = 3, Q = 3)
+fits[["out-of-sample"]] <- mbtransfer(ts[c(1:5, 11:15)], P = 2, Q = 2)
 ts_preds[["out-of-sample"]] <- predict(fits[["out-of-sample"]], ts_missing[c(6:10, 16:20)])
 ```
 
@@ -196,9 +197,9 @@ that counterfactual, the second gives the candidate intervention lengths, and
 the last gives the length of the overall output sequence.
 
 ```{r}
-ws <- steps(c("Plant" = TRUE, "Animal" = FALSE), lengths = 1:3, L = 4) |>
-  c(steps(c("Plant" = FALSE, "Animal" = TRUE), lengths = 1:3, L = 4))
-ws
+ws <- steps(c("Plant" = TRUE, "Animal" = FALSE), lengths = 1:4, L = 4) |>
+  c(steps(c("Plant" = FALSE, "Animal" = TRUE), lengths = 1:4, L = 4))
+ws[c(1, 2, 10)]
 ```
 
 The block below runs an instantiation of the mirror statistics FDR controlling
@@ -213,7 +214,8 @@ value and still work through the rest of this vignette (many taxa will still be
 easily detectable).
 
 ```{r}
-staxa <- select_taxa(ts, ws[[1]], ws[[8]],  \(x) mbtransfer(x, 3, 3), n_splits = 20)
+staxa <- select_taxa(ts, ws[[1]], ws[[10]],  \(x) mbtransfer(x, 2, 2), n_splits = 25)
+staxa <- readRDS(url("https://github.com/krisrs1128/mbtransfer_demo/raw/main/staxa-aqua.rds"))
 ```
 
 In addition to the selected set of taxa, this function returns the mirror
@@ -269,10 +271,10 @@ imaginary `ts` objects, we fill in predictions for every timepoint that appears
 as a column of `interventions` but not of `values`.
 
 ```{r}
-ws <- steps(c("Plant" = TRUE, "Animal" = FALSE), lengths = 1:3, L = 8) |>
-  c(steps(c("Plant" = FALSE, "Animal" = TRUE), lengths = 1:3, L = 8))
+ws <- steps(c("Plant" = TRUE, "Animal" = FALSE), lengths = 1:4, L = 8) |>
+  c(steps(c("Plant" = FALSE, "Animal" = TRUE), lengths = 1:4, L = 8))
 
-sim_ts <- counterfactual_ts(ts, ws[[1]], ws[[8]], start_ix = 4) |>
+sim_ts <- counterfactual_ts(ts, ws[[1]], ws[[10]], start_ix = 4) |>
   map(~ predict(fits[["in-sample"]], .))
 ```
 
