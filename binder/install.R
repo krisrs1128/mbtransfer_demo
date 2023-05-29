@@ -1,1 +1,1 @@
-install.packages(c("tidyverse", "xgboost", "BiocManager", "devtools", "RefManageR"))
+install.packages(c("xgboost", "BiocManager", "devtools", "RefManageR", "tidymodels"))

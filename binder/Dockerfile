@@ -17,9 +17,11 @@ RUN echo "Checking for 'apt.txt'..." \
         ; fi
 USER ${NB_USER}
 
+RUN echo tmp
+
 ## Run an install.R script, if it exists.
 RUN if [ -f install.R ]; then R --quiet -f install.R; fi
 
 RUN Rscript -e "BiocManager::install(c('phyloseq'))"
-RUN echo tmp
+RUN Rscript -e "devtools::install_github('tidyverse/tidyverse')"
 RUN Rscript -e "devtools::install_github('krisrs1128/mbtransfer')"
