@@ -1,18 +1,21 @@
-from rocker/tidyverse
+FROM rocker/binder:4.2.0
 
-ENV PATH="/home/miniconda3/bin:${PATH}"
-ARG PATH="/home/miniconda3/bin:${PATH}"
-RUN apt-get update
+## Declares build arguments
+ARG NB_USER
+ARG NB_UID
 
-RUN apt-get install -y wget libglpk-dev && rm -rf /var/lib/apt/lists/*
+COPY --chown=${NB_USER} . ${HOME}
 
-RUN wget \
-    https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh \
-    && mkdir /home/.conda \
-    && bash Miniconda3-latest-Linux-x86_64.sh -b -p /home/miniconda3/ \
-    && rm -f Miniconda3-latest-Linux-x86_64.sh 
-RUN Rscript -e "install.packages(c('xgboost', 'MCMCpack', 'reticulate', 'slider', 'vctrs', 'igraph', 'abind', 'ggh4x', 'fido'))"
-RUN Rscript -e "install.packages('BiocManager'); BiocManager::install(c('phyloseq', 'DESeq2')); devtools::install_github('ruochenj/mbImpute/mbImpute R package');"
+ENV DEBIAN_FRONTEND=noninteractive
+USER root
+RUN echo "Checking for 'apt.txt'..." \
+        ; if test -f "apt.txt" ; then \
+        apt-get update --fix-missing > /dev/null\
+        && xargs -a apt.txt apt-get install --yes \
+        && apt-get clean > /dev/null \
+        && rm -rf /var/lib/apt/lists/* \
+        ; fi
+USER ${NB_USER}
 
-ENV HOME="/home/"
-RUN chmod -R 777 /home/ /usr/local/
+## Run an install.R script, if it exists.
+RUN if [ -f install.R ]; then R --quiet -f install.R; fi
