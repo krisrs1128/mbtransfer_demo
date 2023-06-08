@@ -47,6 +47,7 @@ library(mbtransfer)
 library(tidyverse)
 library(glue)
 library(tidymodels)
+library(patchwork)
 th <- theme_bw() +
   theme(
     panel.grid.minor = element_blank(),
@@ -87,6 +88,8 @@ than entirely ignoring variation in the gaps between samples.
 ts <- as.matrix(reads) |>
   ts_from_dfs(interventions, samples, subject) |>
   interpolate(method = "linear")
+
+ts
 ```
 
 Before doing any modeling, let's visualize some of the raw data. The plot below
@@ -214,8 +217,8 @@ value and still work through the rest of this vignette (many taxa will still be
 easily detectable).
 
 ```{r}
-staxa <- select_taxa(ts, ws[[1]], ws[[10]],  \(x) mbtransfer(x, 2, 2), n_splits = 25)
-staxa <- readRDS(url("https://github.com/krisrs1128/mbtransfer_demo/raw/main/staxa-aqua.rds"))
+#staxa <- select_taxa(ts, ws[[1]], ws[[10]],  \(x) mbtransfer(x, 2, 2), n_splits = 25)
+staxa <- readRDS(url("https://github.com/krisrs1128/mbtransfer_demo/raw/main/staxa-diet.rds"))
 ```
 
 In addition to the selected set of taxa, this function returns the mirror
@@ -234,7 +237,7 @@ staxa$ms <- staxa$ms |>
 vis_otus <- staxa$ms |>
   group_by(taxon) |>
   summarise(m = mean(m)) |>
-  slice_max(m, n = 50) |>
+  slice_max(m, n = 100) |>
   pull(taxon)
 
 focus_taxa <- unlist(map(staxa$taxa, ~ c(.)))
@@ -301,7 +304,7 @@ quartiles always agree with one another. This suggests that the model has
 focused on effects from $w_{t}$, and that the initial community profiles $y_{t}$
 play no role in the model's reduction.
 
-```{r, fig.height = 5, fig.width = 9}
+```{r, fig.height = 5, fig.width = 12}
 rdata_wide <- rdata |>
   select(taxon, time, median) |>
   filter(time > 0) |>
@@ -318,7 +321,12 @@ rdata_order <- rdata_wide |>
 rdata |>
   left_join(rdata_order) |>
   ribbon_plot(reorder_var = "1") +
-  theme(panel.spacing = unit(0, "line"))
+  scale_y_continuous(breaks = 2) +
+  labs(x = "Time", y = "Median Counterfactual Diference") +
+  theme(
+    panel.spacing = unit(0, "line"),
+    axis.text.y = element_text(size = 8)
+  )
 ```
 
 In the spirit of progressive disclosure in data visualization, we can plot the
@@ -338,9 +346,61 @@ Overall, we recommend an overall workflow that first evaluates taxa using formal
 models and then investigates subject-level variation using
 
 ```{r, fig.height = 3, fig.width = 11}
-values_df |>
+taxa_hm <- c("Otu000011", "Otu000095", "Otu000434", "Otu000236", "Otu000169", "Otu000017")
+
+hm_data <- values_df |>
   filter(diet == "Animal") |>
-  group_by(taxon) |>
-  mutate(value = rank(value) / n()) |>
-  interaction_hm(taxa = c("Otu000011", "Otu000017", "Otu000142"), "diet")
+  group_by(taxon)
+
+hm_data |>
+  mutate(
+    value = rank(value) / n(),
+    taxon = factor(taxon, levels = taxa_hm)
+  ) |>
+  interaction_hm(taxa = taxa_hm, "diet") +
+  scale_color_gradient(low = "#eaf7f7", high = "#037F8C") +
+  scale_fill_gradient(low = "#eaf7f7", high = "#037F8C") +
+  labs(x = "Time", y = "Subject", fill = "Rank", color = "Rank")
+```
+
+We can merge the two figures above so that it's easier to compare simulated with
+real data. We'll focus on every third taxon in the original display.
+
+```{r, fig.width = 10, fig.height = 4}
+focus_taxa <- rdata_order |>
+  arrange(`1`) |>
+  filter(row_number() %% 6 == 0) |>
+  pull(taxon)
+
+p1 <- rdata |>
+  filter(taxon %in% focus_taxa) |>
+  left_join(rdata_order) |>
+  ribbon_plot(reorder_var = "1") +
+  scale_x_continuous(breaks = seq(-5, 8, by = 3)) +
+  scale_y_continuous(breaks = round(seq(-.2, 1, by = 0.2), 1)) +
+  facet_grid(. ~ reorder(taxon, `1`)) +
+  labs(title = "(a) Counterfactual Difference at Interventions", y = "Difference") +
+  theme(
+    panel.spacing = unit(0, "line"),
+    axis.text.x = element_text(size = 8),
+    axis.text.y = element_text(size = 7),
+    axis.title.x = element_blank(),
+    plot.margin = unit(c(0, 0, 0, 0), "null")
+  )
+
+p2 <- hm_data |>
+  mutate(
+    value = rank(value) / n(),
+    taxon = factor(taxon, levels = focus_taxa)
+  ) |>
+  interaction_hm(taxa = focus_taxa, "diet") +
+  scale_color_gradient(low = "#eaf7f7", high = "#037F8C") +
+  scale_fill_gradient(low = "#eaf7f7", high = "#037F8C") +
+  labs(x = "Time", y = "Subject", fill = "Rank", color = "Rank", title = "(b) Original Data") +
+  theme(legend.position = "left")
+
+
+p1 / p2 +
+  plot_layout(heights = c(1, 2), guides = "collect") &
+  theme(legend.position = "right")
 ```

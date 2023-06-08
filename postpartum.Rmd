@@ -44,6 +44,7 @@ specific to this problem context.
 library(fs)
 library(tidyverse)
 library(mbtransfer)
+library(patchwork)
 library(glue)
 th <- theme_bw() +
   theme(
@@ -101,6 +102,8 @@ day) resolution using the `interpolate` function.
 ts <- reads |>
  ts_from_dfs(interventions, samples, subject_data) |>
  interpolate(delta = 14, method = "linear")
+
+ts
 ```
 Now that we have constructed our interpolated `ts_inter` object, it can be
 helpful to visualize the subject trajectories. We can use `pivot_ts` to convert
@@ -231,7 +234,7 @@ still guarantee FDR control, and you will still be able to run the rest of the
 vignette even if you set `n_splits` to a value like 3 or 4.
 
 ```{r}
-staxa <- select_taxa(ts, ws[[1]], ws[[2]], ~ mbtransfer(., 2, 2), n_splits = 25)
+#staxa <- select_taxa(ts, ws[[1]], ws[[2]], ~ mbtransfer(., 2, 2), n_splits = 25)
 staxa <- readRDS(url("https://github.com/krisrs1128/mbtransfer_demo/raw/main/staxa-postpartum.rds"))
 ```
 
@@ -355,4 +358,38 @@ interaction_hm(values_df, vis_taxa, "BirthControlYesNo", -1, width = 14) +
     axis.text.y = element_blank(),
     strip.text = element_text(size = 12)
   )
+```
+```{r, fig.width = 10, fig.height = 4}
+p1 <- rdata |>
+  filter(taxon %in% focus_taxa) |>
+  mutate(taxon = factor(taxon, levels = c("Lactobacillus", "L.iners", "L.jensenii", "Atopobium", "Prevotella_6", "Porphyromonas"))) |>
+  ribbon_plot(group = "BC") +
+  scale_color_manual(values = pal) +
+  scale_fill_manual(values = pal) +
+  facet_grid(. ~ taxon) +
+  labs(title = "(a) Counterfactual Diference at Interventions", y = "Difference") +
+  theme(
+    panel.spacing = unit(0, "line"),
+    axis.text.x = element_text(size = 8),
+    axis.title.x = element_blank(),
+    plot.margin = unit(c(0, 0, 0, 0), "null")
+  )
+
+p2 <- values_df |>
+  mutate(
+    value = rank(value) / n(),
+    taxon = factor(taxon, levels = c("Lactobacillus", "L.iners", "L.jensenii", "Atopobium", "Prevotella_6", "Porphyromonas"))
+  )|>
+  interaction_hm(taxa = focus_taxa, "BirthControlYesNo", -1, width = 14) +
+  scale_color_gradient(low = "#eaf7f7", high = "#037F8C") +
+  scale_fill_gradient(low = "#eaf7f7", high = "#037F8C") +
+  labs(x = "Time", y = "Subject", fill = "Rank", color = "Rank", title = "(b) Original Data") +
+  theme(
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
+
+p1 / p2 +
+  plot_layout(heights = c(1, 2), guides = "collect") &
+  theme(legend.position = "right")
 ```
