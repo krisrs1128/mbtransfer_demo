@@ -22,4 +22,4 @@ RUN echo tmp
 RUN Rscript -e "devtools::install_github('tidyverse/tidyverse')"
 RUN Rscript -e "devtools::install_github('tidyverse/ggplot2')"
 RUN Rscript -e "devtools::install_github('krisrs1128/mbtransfer')"
-RUN Rscript install.R
+RUN Rscript -e "install.packages(c('xgboost', 'tidymodels', 'RefManageR'))"
