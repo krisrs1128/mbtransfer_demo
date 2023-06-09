@@ -22,6 +22,4 @@ RUN echo tmp
 RUN Rscript -e "devtools::install_github('tidyverse/tidyverse')"
 RUN Rscript -e "devtools::install_github('tidyverse/ggplot2')"
 RUN Rscript -e "devtools::install_github('krisrs1128/mbtransfer')"
-
-## Run an install.R script, if it exists.
-RUN if [ -f install.R ]; then R --quiet -f install.R; fi
+RUN Rscript install.R
