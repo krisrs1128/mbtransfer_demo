@@ -6,7 +6,6 @@ vignette: >
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
-
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
@@ -70,9 +69,9 @@ be used by our `ts_from_dfs` function.
 ```{r}
 subject <- read_csv("https://figshare.com/ndownloader/files/40275934/subject.csv")
 interventions <- read_csv("https://figshare.com/ndownloader/files/40279171/interventions.csv") |>
- column_to_rownames("sample")
+  column_to_rownames("sample")
 reads <- read_csv("https://figshare.com/ndownloader/files/40279108/reads.csv") |>
- column_to_rownames("sample")
+  column_to_rownames("sample")
 samples <- read_csv("https://figshare.com/ndownloader/files/40275943/samples.csv")
 ```
 
@@ -155,8 +154,8 @@ ts_preds[["out-of-sample"]] <- predict(fits[["out-of-sample"]], ts_missing[c(6:1
 ```
 
 Let's compare the two types of prediction performance. We'll consider several
-time horizons (using the sequence of $\hat{y}_{t + h}$ to make predictions of
-$\hat{y}_{t + h + 1}$) and distinguish between taxa with lower/higher overall
+time horizons -- using the sequence of $\hat{y}_{t + h}$ to make predictions of
+$\hat{y}_{t + h + 1}$ -- and distinguish between taxa with lower/higher overall
 abundance. Our predictions seem reasonable for the higher abundance taxa.
 However, the blue points are more spread out than the purple in the bottom
 panels, meaning that our model has overfit the lower abundance taxa. This is
@@ -165,26 +164,44 @@ participants, but the person-to-person variability might be too high for us to
 make reasonable generalizations for less abundant taxa.
 
 ```{r, fig.width = 10, fig.height = 6}
-map_dfr(ts_preds, ~ reshape_preds(ts, .), .id = "generalization") |>
-    filter(h > 0, h < 6) |>
-    ggplot() +
-    geom_abline(slope = 1, col = "#400610") +
-    geom_point(aes(y, y_hat, col = generalization), size = .7, alpha = .6) +
-    facet_grid(factor(quantile, rev(levels(quantile))) ~ glue("lag {h}"), scales = "free_y") +
-    labs(x = expression(y), y = expression(hat(y)), col = "Generalization") +
-    scale_x_continuous(expand = c(0, 0), n.breaks = 3) +
-    scale_y_continuous(expand = c(0, 0), n.breaks = 3) +
-    scale_color_manual(values = c("#A65883", "#6593A6")) +
-    guides("color" = guide_legend(override.aes = list(size = 4, alpha = 1))) +
-    theme(
-      axis.text = element_text(size = 10),
-      panel.spacing = unit(0, "line"),
-      strip.text.y = element_text(angle = 0, size = 12),
-      strip.text.x = element_text(angle = 0, size = 12),
-      legend.title = element_text(size = 14),
-      legend.text = element_text(size = 11),
-    )
+reshaped_preds <- map_dfr(ts_preds, ~ reshape_preds(ts, .), .id = "generalization") |>
+  filter(h > 0, h < 6)
+
+reshaped_preds |>
+  mutate(h = glue("lag {h}")) |>
+  ggplot() +
+  geom_abline(slope = 1, col = "#400610") +
+  geom_point(aes(y, y_hat, col = generalization), size = .7, alpha = .6) +
+  facet_grid(factor(quantile, rev(levels(quantile))) ~ h, scales = "free_y") +
+  labs(x = expression(y), y = expression(hat(y)), col = "Generalization") +
+  scale_x_continuous(expand = c(0, 0), n.breaks = 3) +
+  scale_y_continuous(expand = c(0, 0), n.breaks = 3) +
+  scale_color_manual(values = c("#A65883", "#6593A6")) +
+  guides("color" = guide_legend(override.aes = list(size = 4, alpha = 1))) +
+  theme(
+    axis.text = element_text(size = 10),
+    panel.spacing = unit(0, "line"),
+    strip.text.y = element_text(angle = 0, size = 12),
+    strip.text.x = element_text(angle = 0, size = 12),
+    legend.title = element_text(size = 14),
+    legend.text = element_text(size = 11),
+  )
 ```
+
+We can make this interpretation more precise by calculating in and out-of-sample
+correlations across panels. Correlation can vary substantially across lag and
+quantile of abundance, though, ranging from $\hat{\rho} = 0.148$ to 0.578.  In
+contrast, the within-subject forecasts are much better, ranging from 0.725 to
+0.896.
+
+```{r}
+reshaped_preds |>
+  group_by(h, quantile, generalization) |>
+  summarise(correlation = round(cor(y, y_hat), 4)) |>
+  pivot_wider(names_from = "generalization", values_from = "correlation") |>
+  arrange(desc(quantile), h)
+```
+
 
 ### Attribution Analysis: Selecting Important Taxa
 
@@ -218,7 +235,8 @@ easily detectable).
 
 ```{r}
 #staxa <- select_taxa(ts, ws[[1]], ws[[10]],  \(x) mbtransfer(x, 2, 2), n_splits = 25)
-staxa <- readRDS(url("https://github.com/krisrs1128/mbtransfer_demo/raw/main/staxa-diet.rds"))
+save(staxa, file = "staxa-diet.rds")
+#staxa <- readRDS(url("https://github.com/krisrs1128/mbtransfer_demo/raw/main/staxa-diet.rds"))
 ```
 
 In addition to the selected set of taxa, this function returns the mirror
@@ -312,12 +330,12 @@ rdata_wide <- rdata |>
 
 rdata_order <- rdata_wide |>
   select(-taxon) %>%
-  recipe(~ ., data = .) |>
+  recipe(~., data = .) |>
   step_pca() |>
   prep() |>
   juice() |>
   mutate(taxon = rdata_wide$taxon)
-  
+
 rdata |>
   left_join(rdata_order) |>
   ribbon_plot(reorder_var = "1") +
